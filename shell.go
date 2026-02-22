@@ -26,6 +26,7 @@ type fakeShell struct {
 	cwd                 string
 	cmdCount            int
 	cmdHistory          []string
+	histIdx             int // -1 = not browsing history
 	honeytokensAccessed []string
 	startTime           time.Time
 	dispatchDepth       int // guards against sudo/eval recursion
@@ -42,6 +43,7 @@ func newFakeShell(ch ssh.Channel, ip, user string, sess *sessionLogger, p server
 		done:      make(chan struct{}),
 		cwd:       "/root",
 		startTime: time.Now(),
+		histIdx:   -1,
 	}
 	go s.inputReader()
 	return s
@@ -486,16 +488,49 @@ func (s *fakeShell) run() {
 	var buf []byte
 	var escBuf []byte
 
+	// replaceInputLine clears the current input on screen and writes newLine.
+	replaceInputLine := func(newLine string) {
+		// Move to start of line, erase to end, rewrite content.
+		s.write("\r\x1b[K" + s.prompt() + newLine)
+		buf = []byte(newLine)
+	}
+
 	for {
 		b, ok := s.readRaw()
 		if !ok {
 			return
 		}
 
-		// Absorb escape sequences (arrow keys, F-keys, etc.)
+		// Collect escape sequences (arrow keys, etc.)
 		if len(escBuf) > 0 {
 			escBuf = append(escBuf, b)
-			if len(escBuf) >= 3 || (len(escBuf) == 2 && b >= 'A' && b <= 'Z') {
+			// Full CSI sequence: ESC [ <final>  where final is 0x40–0x7E
+			if len(escBuf) == 3 && escBuf[1] == '[' {
+				switch escBuf[2] {
+				case 'A': // Up arrow — older history
+					if len(s.cmdHistory) > 0 {
+						if s.histIdx == -1 {
+							s.histIdx = len(s.cmdHistory) - 1
+						} else if s.histIdx > 0 {
+							s.histIdx--
+						}
+						replaceInputLine(s.cmdHistory[s.histIdx])
+					}
+				case 'B': // Down arrow — newer history
+					if s.histIdx != -1 {
+						if s.histIdx < len(s.cmdHistory)-1 {
+							s.histIdx++
+							replaceInputLine(s.cmdHistory[s.histIdx])
+						} else {
+							s.histIdx = -1
+							replaceInputLine("")
+						}
+					}
+				// Left/right arrows: ignore (no cursor movement support)
+				}
+				escBuf = escBuf[:0]
+			} else if len(escBuf) >= 3 || (len(escBuf) == 2 && b != '[') {
+				// Absorb other sequences (F-keys, etc.)
 				escBuf = escBuf[:0]
 			}
 			continue
@@ -510,6 +545,7 @@ func (s *fakeShell) run() {
 			s.write("\r\n")
 			line := strings.TrimSpace(string(buf))
 			buf = buf[:0]
+			s.histIdx = -1
 			if line != "" {
 				s.cmdCount++
 				s.cmdHistory = append(s.cmdHistory, line)
