@@ -52,7 +52,9 @@ Attackers land as `root` on a fake Ubuntu server with a realistic filesystem:
 | `wget / curl` | slow DNS, progress bar stalls at 73%, then timeout |
 | `ssh 10.0.1.x` | pivots into fake internal hosts with their own secrets |
 | `sudo` | asks for password, waits 1.5s, rejects |
-| `vim / nano / emacs` | Error opening terminal |
+| `nano / pico / micro` | fully interactive fake GNU nano 6.2 (edit, save, Ctrl+X exit) |
+| `vim / vi` | fully interactive fake vim (normal/insert/command modes, `:wq`, `dd`, etc.) |
+| `emacs` | fully interactive fake GNU Emacs 27.2 (C-x C-c quit, M-x commands, isearch) |
 | `apt-get / yum` | lock file permission denied |
 | `nmap` | hangs 5–12s, returns fake port scan |
 | `john / hashcat` | runs for 30s then "cracks" a honeytoken password |

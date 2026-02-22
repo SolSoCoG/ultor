@@ -1270,7 +1270,11 @@ func (s *fakeShell) dispatch(line string) string {
 		s.runVim(args)
 		return ""
 
-	case "emacs", "joe":
+	case "emacs":
+		s.runEmacs(args)
+		return ""
+
+	case "joe":
 		time.Sleep(s.jitter(300, 800))
 		return "Error opening terminal: unknown terminal type."
 
