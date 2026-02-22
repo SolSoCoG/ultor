@@ -1266,7 +1266,11 @@ func (s *fakeShell) dispatch(line string) string {
 		s.runNano(args)
 		return ""
 
-	case "vim", "vi", "emacs", "joe":
+	case "vim", "vi":
+		s.runVim(args)
+		return ""
+
+	case "emacs", "joe":
 		time.Sleep(s.jitter(300, 800))
 		return "Error opening terminal: unknown terminal type."
 
